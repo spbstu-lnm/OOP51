@@ -1,0 +1,15 @@
+*.o
+*.obj
+*.exe
+*.out
+*.dll
+*.so
+*.dylib
+*.pyd
+*.lib
+*.a
+
+out/
+dist/
+__pycache__/
+*.pyc
