@@ -1,19 +1,15 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++17
+CXXFLAGS = -Wall -Wextra -std=c++17 -fPIC
 
 SRC_DIR = src
 OUT_DIR = out
 
-TARGET = $(OUT_DIR)/test
+PYTHON ?= python3
+PYTHON_INCLUDES := $(shell $(PYTHON) -m pybind11 --includes)
+PYTHON_EXTENSION_SUFFIX := $(shell $(PYTHON) -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))")
+TARGET = $(OUT_DIR)/mystring$(PYTHON_EXTENSION_SUFFIX)
 
-SRCS = $(SRC_DIR)/main.cpp $(SRC_DIR)/MyString.cpp
-
-
-#PYTHON_CFLAGS := $(shell python3-config --cflags)
-#PYTHON_LIBS   := $(shell python3-config --libs --embed)
-
-#CXXFLAGS += $(PYTHON_CFLAGS)
-#LDFLAGS  += $(PYTHON_LIBS)
+SRCS = $(SRC_DIR)/MyString.cpp $(SRC_DIR)/MyString_wrapper.cpp
 
 
 .PHONY: all clean
@@ -21,8 +17,9 @@ SRCS = $(SRC_DIR)/main.cpp $(SRC_DIR)/MyString.cpp
 
 all: $(TARGET)
 
-$(TARGET): $(SRCS)
-	$(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
+$(TARGET): $(SRCS) $(SRC_DIR)/MyString.h $(SRC_DIR)/MyString_wrapper.h
+	@mkdir -p $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) $(PYTHON_INCLUDES) -shared $(SRCS) -o $(TARGET)
 
 clean:
 	rm -f $(TARGET)
