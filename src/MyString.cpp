@@ -55,7 +55,8 @@ MyString::MyString(int count, char character) : MyString() {
 	}
 
 	if (count > 0) {
-		capacity_ = static_cast<size_t>(count) + 1;
+		len_ = static_cast<size_t>(count);
+		capacity_ = len_ + 1;
 
 		buf_ = new char[capacity_];
 
@@ -63,8 +64,6 @@ MyString::MyString(int count, char character) : MyString() {
 			buf_[i] = character;
 		}
 		buf_[len_] = '\0';
-
-		len_ = static_cast<size_t>(count);
 	}
 }
 
