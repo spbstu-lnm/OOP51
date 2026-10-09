@@ -1,5 +1,4 @@
 #include "MyString.h"
-#include "MyString_wrapper.h"
 
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
