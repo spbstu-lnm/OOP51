@@ -1,5 +1,6 @@
 #include "MyString.h"
 
+#include <cstddef>
 #include <cstring>
 #include <ostream>
 #include <memory>
@@ -168,7 +169,7 @@ void MyString::clear() {
 
 
 void MyString::shrink_to_fit() {
-	if (capacity_ == len_ + 1) return;
+	if (buf_ == nullptr | capacity_ == len_ + 1) return;
 
 	if (len_ == 0) {
 		delete[] buf_;
@@ -263,38 +264,49 @@ void MyString::insert(int index, int count, char character) {
 
 	const size_t added = static_cast<size_t>(count);
 	const size_t new_length = len_ + added;
-	const size_t new_capacity = 
-		new_length + 1 > capacity_ ? new_length + 1 : capacity_;
+	if (new_length + 1 > capacity_) {
+		const size_t new_capacity = new_length + 1;
 
-	std::unique_ptr<char[]> buffer(new char[new_capacity]);
+		std::unique_ptr<char[]> buffer(new char[new_capacity]);
 
-	if (index > 0) {
-		std::memcpy(
-			buffer.get(), 
-			c_str(), 
-			static_cast<size_t>(index)
+		if (index > 0) {
+			std::memcpy(
+				buffer.get(), 
+				c_str(), 
+				static_cast<size_t>(index)
+			);
+		}
+
+		for (size_t i = 0; i < added; ++i) {
+			buffer[static_cast<size_t>(index) + i] = character;
+		}
+
+		if (len_ > static_cast<size_t>(index)) {
+			std::memcpy(
+				buffer.get() + index + added, 
+				c_str() + index, 
+				len_ - static_cast<size_t>(index)
+			);
+		}
+
+		buffer[new_length] = '\0';
+
+		delete[] buf_;
+
+		buf_ = buffer.release();
+		len_ = new_length;
+		capacity_ = new_capacity;
+	} else {
+		std::memmove(
+			buf_ + index,
+			buf_ + index + count,
+			count
 		);
+		
+		for (size_t i = 0; i < added; ++i) {
+			buf_[i] = character;
+		}
 	}
-
-	for (size_t i = 0; i < added; ++i) {
-		buffer[static_cast<size_t>(index) + i] = character;
-	}
-
-	if (len_ > static_cast<size_t>(index)) {
-		std::memcpy(
-			buffer.get() + index + added, 
-			c_str() + index, 
-			len_ - static_cast<size_t>(index)
-		);
-	}
-
-	buffer[new_length] = '\0';
-
-	delete[] buf_;
-
-	buf_ = buffer.release();
-	len_ = new_length;
-	capacity_ = new_capacity;
 }
 
 
@@ -329,6 +341,8 @@ void MyString::insert(int i, const MyString& s, int n) {
 
 
 void MyString::insert(int i, const char* s, int si, int n) { 
+	// TODO: move insert_data here
+	// TODO: fix extra allocation
 	insert_data(i, s, si, n); 
 }
 
