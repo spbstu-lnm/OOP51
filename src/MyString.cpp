@@ -1,6 +1,7 @@
 #include "MyString.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <ostream>
 #include <memory>
@@ -32,6 +33,18 @@ size_t SourceLength(const char* source) {
 
 	return std::strlen(source);
 }
+
+
+void Reverse(char* data, size_t first, size_t last) {
+	while (first < last) {
+		--last;
+		if (first >= last) break;
+		const char value = data[first];
+		data[first++] = data[last];
+		data[last] = value;
+	}
+}
+
 }
 
 
@@ -169,7 +182,7 @@ void MyString::clear() {
 
 
 void MyString::shrink_to_fit() {
-	if (buf_ == nullptr | capacity_ == len_ + 1) return;
+	if (buf_ == nullptr || capacity_ == len_ + 1) return;
 
 	if (len_ == 0) {
 		delete[] buf_;
@@ -207,53 +220,6 @@ size_t MyString::capacity() const { return capacity_; }
 
 
 bool MyString::empty() const { return len_ == 0; }
-
-
-void MyString::insert_data(int index, const char* source, int source_index, int count) {
-	CheckSource(source);
-	CheckRange(index, 0, len_);
-
-	if (source_index < 0 || count < 0 || static_cast<size_t>(source_index) > std::strlen(source) ||
-		static_cast<size_t>(count) > std::strlen(source) - static_cast<size_t>(source_index)) {
-
-		throw std::out_of_range("MyString source range is out of range");
-	}
-
-	if (count == 0) return;
-
-	const size_t added = static_cast<size_t>(count);
-	const size_t new_length = len_ + added;
-
-	std::unique_ptr<char[]> source_copy(new char[added]);
-	std::memcpy(source_copy.get(), source + source_index, added);
-
-	const size_t new_capacity = 
-		new_length + 1 > capacity_ ? new_length + 1 : capacity_;
-
-	std::unique_ptr<char[]> buffer(new char[new_capacity]);
-
-	if (index > 0) {
-		std::memcpy(buffer.get(), c_str(), static_cast<size_t>(index));
-	}
-
-	std::memcpy(buffer.get() + index, source_copy.get(), added);
-
-	if (len_ > static_cast<size_t>(index)) {
-		std::memcpy(
-			buffer.get() + index + added, 
-			c_str() + index, 
-			len_ - static_cast<size_t>(index)
-		);
-	}
-
-	buffer[new_length] = '\0';
-
-	delete[] buf_;
-	buf_ = buffer.release();
-
-	len_ = new_length;
-	capacity_ = new_capacity;
-}
 
 
 void MyString::insert(int index, int count, char character) {
@@ -294,24 +260,22 @@ void MyString::insert(int index, int count, char character) {
 		delete[] buf_;
 
 		buf_ = buffer.release();
-		len_ = new_length;
 		capacity_ = new_capacity;
 	} else {
-		std::memmove(
-			buf_ + index,
-			buf_ + index + count,
-			count
-		);
+		std::memmove(buf_ + index + added, buf_ + index, len_ - static_cast<size_t>(index) + 1);
 		
 		for (size_t i = 0; i < added; ++i) {
-			buf_[i] = character;
+			buf_[static_cast<size_t>(index) + i] = character;
 		}
 	}
+	
+	len_ = new_length;
 }
 
 
 void MyString::insert(int i, const char* s) { 
-	insert_data(i, s, 0, static_cast<int>(SourceLength(s))); 
+	int count = static_cast<int>(SourceLength(s));
+	insert(i, s, 0, count); 
 }
 
 
@@ -326,7 +290,7 @@ void MyString::insert(int i, const MyString& s) {
 
 
 void MyString::insert(int i, const char* s, int n) { 
-	insert_data(i, s, 0, n); 
+	insert(i, s, 0, n); 
 }
 
 
@@ -340,10 +304,74 @@ void MyString::insert(int i, const MyString& s, int n) {
 }
 
 
-void MyString::insert(int i, const char* s, int si, int n) { 
-	// TODO: move insert_data here
-	// TODO: fix extra allocation
-	insert_data(i, s, si, n); 
+void MyString::insert(int index, const char* source, int source_index, int count) { 
+	CheckSource(source);
+	CheckRange(index, 0, len_);
+
+	const size_t source_length = std::strlen(source);
+	if (source_index < 0 || count < 0 || static_cast<size_t>(source_index) > source_length ||
+		static_cast<size_t>(count) > source_length - static_cast<size_t>(source_index)) {
+
+		throw std::out_of_range("MyString source range is out of range");
+	}
+
+	if (count == 0) return;
+
+	const size_t added = static_cast<size_t>(count);
+	const size_t old_length = len_;
+	const size_t new_length = old_length + added;
+	if (new_length + 1 > capacity_) {
+		const size_t new_capacity = new_length + 1;
+
+		std::unique_ptr<char[]> source_copy(new char[added]);
+
+		std::memcpy(source_copy.get(), source + source_index, added);
+
+		std::unique_ptr<char[]> buffer(new char[new_capacity]);
+
+		if (index > 0) {
+			std::memcpy(buffer.get(), c_str(), static_cast<size_t>(index));
+		}
+
+		std::memcpy(buffer.get() + index, source_copy.get(), added);
+
+		if (old_length > static_cast<size_t>(index)) {
+			std::memcpy(buffer.get() + index + added, c_str() + index,
+				old_length - static_cast<size_t>(index));
+		}
+
+		buffer[new_length] = '\0';
+
+		delete[] buf_;
+
+		buf_ = buffer.release();
+		capacity_ = new_capacity;
+	} else {
+		const uintptr_t buffer_address = reinterpret_cast<uintptr_t>(buf_);
+		const uintptr_t source_address = reinterpret_cast<uintptr_t>(source);
+
+		const bool source_is_buffer = buf_ != nullptr && source_address >= buffer_address &&
+			source_address - buffer_address <= old_length;
+
+		if (source_is_buffer) {
+			// Copy the selected fragment into the free tail before rotating the
+			// original tail behind it. The three reversals exchange these blocks.
+			std::memcpy(buf_ + old_length, source + source_index, added);
+
+			Reverse(buf_, static_cast<size_t>(index), new_length);
+			Reverse(buf_, static_cast<size_t>(index), static_cast<size_t>(index) + added);
+			Reverse(buf_, static_cast<size_t>(index) + added, new_length);
+		} else {
+			std::memmove(buf_ + index + added, buf_ + index,
+				old_length - static_cast<size_t>(index) + 1);
+
+			std::memcpy(buf_ + index, source + source_index, added);
+		}
+
+		buf_[new_length] = '\0';
+	}
+
+	len_ = new_length;
 }
 
 

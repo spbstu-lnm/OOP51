@@ -109,8 +109,6 @@ private:
 	size_t len_;
 	char* buf_;
 	size_t capacity_;
-
-	void insert_data(int, const char*, int, int);
 };
 
 
